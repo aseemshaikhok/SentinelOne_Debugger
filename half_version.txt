@@ -1,0 +1,32 @@
+#SentinelOne Debugger Tool
+$DesktopPath = [Environment]::GetFolderPath("Desktop")
+$filename = hostname
+$filename = 'SentinelOne '+$filename+'.log' 
+New-Item -path $DesktopPath -name $filename -ItemType "file"
+$logfile = $DesktopPath+'\'+$filename
+$divider  = '================================================================================='
+Add-Content $logfile -Value (systeminfo) #systeminfo
+Add-Content $logfile -Value $divider
+Add-Content $logfile -Value 'Sentinel Folder Map'
+Add-Content $logfile -Value $(Get-ChildItem -Path 'c:\program files\SentinelOne\') #Agent Map
+Add-Content $logfile -Value $divider
+Add-Content $logfile -Value 'Sentinel Status'
+Add-Content $logfile -Value $(&'C:\Program Files\SentinelOne\Sentinel*\SentinelCtl.exe' status) #Agent status
+Add-Content $logfile -Value $(&'C:\Program Files\SentinelOne\Sentinel*\SentinelCtl.exe' load -a) #Load agent
+Add-Content $logfile -Value $(&'C:\Program Files\SentinelOne\Sentinel*\SentinelCtl.exe' ever_connected_to_management) #Agent connected to Mgmt
+Add-Content $logfile -Value $(&'C:\Program Files\SentinelOne\Sentinel*\SentinelCtl.exe' agent_id) #Agent id
+Add-Content $logfile -Value $divider
+Add-Content $logfile -Value 'Sentinel Config'
+Add-Content $logfile -Value $(&'C:\Program Files\SentinelOne\Sentinel*\SentinelCtl.exe' config) #Agent Config
+Add-Content $logfile -Value $divider
+Add-Content $logfile -Value 'ping test'
+$config = & 'C:\Program Files\SentinelOne\Sentinel*\SentinelCtl.exe' config | select-string -Pattern "server.mgmtServer"
+[System.Uri]$mgmt = ($config -split ' ' | select -last 1 )
+Add-Content $logfile -Value $(ping $mgmt.Host | Out-String) #Ping Test
+Add-Content $logfile -Value $divider
+Add-Content $logfile -Value 'Services'
+Add-Content $logfile -Value (Get-Service | Format-Table | Out-String) #Service Details
+Add-Content $logfile -Value $divider
+Add-Content $logfile -Value $(netstat -bof) #System Connections
+Add-Content $logfile -Value $divider
+wevtutil epl SentinelOne/Operational ($DesktopPath+'\sentinelone.evtx')
