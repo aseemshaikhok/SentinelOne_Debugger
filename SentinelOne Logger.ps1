@@ -18,4 +18,4 @@ Add-Content $logfile -Value ($divider)
 
 
 #Agent json 
-Add-Content $logfile -Value ((New-Object -ComObject 'SentinelHelper.1').GetAgentStatusJSON() | ConvertFrom-Json | Write-Host)
+Add-Content $logfile -Value ((New-Object -ComObject 'SentinelHelper.1').GetAgentStatusJSON() | ConvertFrom-Json | Out-String)
