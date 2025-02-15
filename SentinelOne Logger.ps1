@@ -57,4 +57,6 @@ try {
     Add-Content $logfile -Value "Error: WMI is not responding. It may be corrupted or disabled."
 }
 
+#Add EventViewer last 10 event viewer logs
+
 Add-Content $logfile -Value $divider

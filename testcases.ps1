@@ -14,7 +14,6 @@ New-Item -Path $logfile -ItemType File | Out-Null
 $divider  = '================================================================================='
 
 #Look for Event-Viewer
-Get-EventLog 
-
+Add-Content $logfile -Value (Get-WinEvent -LogName 'SentinelOne/Operational' -MaxEvents 10 | Format-Table -Wrap | Out-String)
 Add-Content $logfile -Value $divider
 Add-Content $logfile -Value "Log Collection Completed"
