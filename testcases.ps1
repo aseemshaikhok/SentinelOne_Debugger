@@ -13,25 +13,105 @@ New-Item -Path $logfile -ItemType File | Out-Null
 # Define divider
 $divider  = '================================================================================='
 
+######################### SentinelOne Info #########################
+Add-Content $logfile -Value "SentinelOne Details"
 
 # Fetching SentinelOne Agent JSON Data
-$procs = Get-Process | Sort-Object "WorkingSet"
-foreach($proc in $procs) {
-   $NonPagedMem = [int]($proc.NPM/1024)
-   $WorkingSet = [int64]($proc.WorkingSet64/1024)
-   $VirtualMem = [int]($proc.VM/1MB)
-   $id= $proc.Id
-   $machine = $proc.MachineName
-   $process = $proc.ProcessName
-   $procdata = new-object psobject
-   $procdata | Add-Member noteproperty NonPagedMem $NonPagedMem
-   $procdata | Add-Member noteproperty WorkingSet $WorkingSet 
-   $procdata | Add-Member noteproperty machine $machine
-   $procdata | Add-Member noteproperty process $process
-   $procdata | Select-Object machine,process,WorkingSet,NonPagedMem
+Write-Host "`Verifying if SentinelOne is installed" -BackgroundColor Green -ForegroundColor Black
+try {
+    $data = (New-Object -ComObject 'SentinelHelper.1').GetAgentStatusJSON() | ConvertFrom-Json
+    Add-Content $logfile -Value "Agent Status JSON:" 
+    Add-Content $logfile -Value ($data | Out-String) -NoNewline
+} catch {
+    Add-Content $logfile -Value "Error: Unable to fetch SentinelOne Agent Data. COM Object may not be registered."
 }
 
 
+# Check if SentinelOne Services and process is Installed
+Write-Host "Verifying if SentinelOne services and process are running" -BackgroundColor Green -ForegroundColor Black
+$SentinelService = Get-Service -Name Sentinel* -ErrorAction SilentlyContinue
+if ($SentinelService) {
+    Add-Content $logfile -Value "Agent Service Found: " -NoNewline
+    Add-Content $logfile -Value ($SentinelService | Format-Table | Out-String)
+    Add-Content $logfile -Value ((Get-Process "Sentinel*" | Select-Object ProcessName, CPU, PrivateMemorySize, TotalProcessorTime, StartTime | Format-Table -AutoSize | Out-String))
+} else {
+    Add-Content $logfile -Value "Error: SentinelOne Agent Service Not Found!"
+}
+
+
+# Ping SentinelOne Management URL
+Write-Host "Verifying if SentinelOne ip addresses work" -BackgroundColor Green -ForegroundColor Black
+if ($data.'mgmt-url') {
+    $url = ($data.'mgmt-url' -split "https://")[-1]
+    Add-Content $logfile -Value "Network Connectivity Check" -NoNewline
+    $pingResult = Test-NetConnection -ComputerName $url -InformationLevel Detailed
+    Add-Content $logfile -Value ($pingResult | Out-String) 
+} else {
+    Add-Content $logfile -Value "Error: SentinelOne Management URL not found in agent data."
+}
+
+
+# WMI test to verify if WMI is functioning correctly
+Write-Host "Verifying WMI functionality" -BackgroundColor Green -ForegroundColor Black
+try {
+    $wmiresponse = Get-WmiObject Win32_OperatingSystem -ErrorAction Stop | Out-String 
+    Add-Content $logfile -Value "WMI is functioning correctly." -NoNewline
+    Add-Content $logfile -Value ($wmiresponse)
+} catch {
+    Add-Content $logfile -Value "Error: WMI is not responding. It may be corrupted or disabled."
+}
+
+
+#Certificate Test
+Write-Host "Verifying installed certificate" -BackgroundColor Green -ForegroundColor Black
+Add-Content $logfile -Value "Performing Certificate Check`n" -NoNewline
+$DigiCertGlobalRootCAThumbprint = 'A8985D3A65E5E5C4B2D7D66D40C6DD2FB19C5436'
+
+#$DigiCertGlobalRootCA = Get-ChildItem -Recurse Cert:\LocalMachine\Root | Where-Object -Property Thumbprint -EQ $DigiCertGlobalRootCAThumbprint | Select-Object -First 1
+$DigiCertGlobalRootCA = Get-ChildItem -Recurse Cert:\LocalMachine\Root | Where-Object {$_.Thumbprint -match $DigiCertGlobalRootCAThumbprint} | Select-Object -First 1
+
+if(!$DigiCertGlobalRootCA){
+    Add-Content $logfile -Value 'ERROR: DigiCert Global Root (Thumbprint A8985D3A65E5E5C4B2D7D66D40C6DD2FB19C5436) CA is not imported in the LocalMachine certificate store.`n'
+} else {
+    Add-Content $logfile -Value 'DigiCert Global Root CA is imported (Thunbprint A8985D3A65E5E5C4B2D7D66D40C6DD2FB19C5436).`n' 
+}
+
+
+#Cipher Test
+
+
+
+#EventViewer last 10 event viewer logs
+Write-Host "Gathering SentinelOne agent event viewer logs" -BackgroundColor Green -ForegroundColor Black
+Add-Content $logfile -Value "Checking sentinelOne Event Logs`n"
+$eventLogs = Get-WinEvent -LogName 'SentinelOne/Operational' -MaxEvents 10 | Format-Table -Wrap | Out-String
+if ($eventLogs){
+    Add-Content $logfile -Value ($eventLogs)
+} else {
+    Add-Content $logfile -Value "SentinelOne event logs not found" 
+}
 
 Add-Content $logfile -Value $divider
-Add-Content $logfile -Value "Log Collection Completed"
+
+######################### Machine Info #########################
+
+#disk information
+Add-Content $logfile -Value ("Disk Information") -NoNewline
+Add-Content $logfile -Value (Get-Volume | Select-Object DriveLetter, FileSystem, FileSystemLabel, SizeRemaining, Size | Format-Table -AutoSize | Out-String)
+
+#memory information
+Add-Content $logfile -Value ("Memory Information") -NoNewline
+$memory = Get-CimInstance Win32_OperatingSystem | Select-Object @{Name="Total Memory (GB)"; Expression={[math]::round($_.TotalVisibleMemorySize / 1MB, 2)}},
+                                                              @{Name="Free Memory (GB)"; Expression={[math]::round($_.FreePhysicalMemory / 1MB, 2)}},
+                                                              @{Name="Total Virtual Memory (GB)"; Expression={[math]::round($_.TotalVirtualMemorySize / 1MB, 2)}},
+                                                              @{Name="Free Virtual Memory (GB)"; Expression={[math]::round($_.FreeVirtualMemory / 1MB, 2)}}
+
+Add-Content $logfile -Value ($memory | Format-Table -AutoSize| Out-String)
+
+#hotfix information
+Get-EventLog -LogName Application -Newest 50 | Where-Object { $_.Message -match "chrome" }
+#Application logs - SentinelOne search
+
+
+
+#System logs - SentinelOne search

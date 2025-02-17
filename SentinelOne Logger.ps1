@@ -18,7 +18,7 @@ Add-Content $logfile -Value (systeminfo)
 Add-Content $logfile -Value $divider
 
 
-################## SentinelOne Info #########################
+######################### SentinelOne Info #########################
 Add-Content $logfile -Value "SentinelOne Details"
 
 # Fetching SentinelOne Agent JSON Data
@@ -57,28 +57,28 @@ if ($data.'mgmt-url') {
 
 
 # WMI test to verify if WMI is functioning correctly
-Write-Host "Verifying WMI functionality" -BackgroundColor Green -ForegroundColor Black
+Write-Host "`nVerifying WMI functionality" -BackgroundColor Green -ForegroundColor Black
 try {
     $wmiresponse = Get-WmiObject Win32_OperatingSystem -ErrorAction Stop | Out-String 
     Add-Content $logfile -Value "WMI is functioning correctly." -NoNewline
     Add-Content $logfile -Value ($wmiresponse)
 } catch {
-    Add-Content $logfile -Value "Error: WMI is not responding. It may be corrupted or disabled."
+    Add-Content $logfile -Value "Error: WMI is not responding. It may be corrupted or disabled. `n Please repair the WMI."
 }
 
 
 #Certificate Test
 Write-Host "Verifying installed certificate" -BackgroundColor Green -ForegroundColor Black
-Add-Content $logfile -Value "Performing Certificate Check" -NoNewline
+Add-Content $logfile -Value "Performing Certificate Check`n" -NoNewline
 $DigiCertGlobalRootCAThumbprint = 'A8985D3A65E5E5C4B2D7D66D40C6DD2FB19C5436'
 
 #$DigiCertGlobalRootCA = Get-ChildItem -Recurse Cert:\LocalMachine\Root | Where-Object -Property Thumbprint -EQ $DigiCertGlobalRootCAThumbprint | Select-Object -First 1
 $DigiCertGlobalRootCA = Get-ChildItem -Recurse Cert:\LocalMachine\Root | Where-Object {$_.Thumbprint -match $DigiCertGlobalRootCAThumbprint} | Select-Object -First 1
 
 if(!$DigiCertGlobalRootCA){
-    Add-Content $logfile -Value 'ERROR: DigiCert Global Root (Thumbprint A8985D3A65E5E5C4B2D7D66D40C6DD2FB19C5436) CA is not imported in the LocalMachine certificate store.'
+    Add-Content $logfile -Value "ERROR: DigiCert Global Root (Thumbprint A8985D3A65E5E5C4B2D7D66D40C6DD2FB19C5436) CA is not imported in the LocalMachine certificate store.`n"
 } else {
-    Add-Content $logfile -Value 'DigiCert Global Root CA is imported (Thunbprint A8985D3A65E5E5C4B2D7D66D40C6DD2FB19C5436).' 
+    Add-Content $logfile -Value "DigiCert Global Root CA is imported (Thunbprint A8985D3A65E5E5C4B2D7D66D40C6DD2FB19C5436).`n" 
 }
 
 
@@ -88,12 +88,37 @@ if(!$DigiCertGlobalRootCA){
 
 #EventViewer last 10 event viewer logs
 Write-Host "Gathering SentinelOne agent event viewer logs" -BackgroundColor Green -ForegroundColor Black
-Add-Content $logfile -Value "SentinelOne Event Logs" -NoNewline
-try{
-    Add-Content $logfile -Value (Get-WinEvent -LogName 'SentinelOne/Operational' -MaxEvents 10 | Format-Table -Wrap | Out-String)
-} catch {
-    Add-Content $logfile -Value "SentinelOne event logs not found" 
+Add-Content $logfile -Value "Checking sentinelOne Event Logs`n"
+$eventLogs = Get-WinEvent -LogName 'SentinelOne/Operational' -MaxEvents 10 
+if ($eventLogs){
+    Add-Content $logfile -Value ($eventLogs| Format-Table -Wrap | Out-String)
+} else {
+    Add-Content $logfile -Value "SentinelOne event logs not found`n" 
 }
 
 Add-Content $logfile -Value $divider
-Add-Content $logfile -Value (systeminfo)
+
+######################### Machine Info #########################
+
+#disk information
+Add-Content $logfile -Value ("Disk Information") -NoNewline
+Add-Content $logfile -Value (Get-Volume | Select-Object DriveLetter, FileSystem, FileSystemLabel, SizeRemaining, Size | Format-Table -AutoSize | Out-String)
+
+#memory information
+Add-Content $logfile -Value ("Memory Information") -NoNewline
+$memory = Get-CimInstance Win32_OperatingSystem | Select-Object @{Name="Total Memory (GB)"; Expression={[math]::round($_.TotalVisibleMemorySize / 1MB, 2)}},
+                                                              @{Name="Free Memory (GB)"; Expression={[math]::round($_.FreePhysicalMemory / 1MB, 2)}},
+                                                              @{Name="Total Virtual Memory (GB)"; Expression={[math]::round($_.TotalVirtualMemorySize / 1MB, 2)}},
+                                                              @{Name="Free Virtual Memory (GB)"; Expression={[math]::round($_.FreeVirtualMemory / 1MB, 2)}}
+
+Add-Content $logfile -Value ($memory | Format-Table -AutoSize| Out-String)
+
+#hotfix information
+Add-Content $logfile -Value ("Hotfix Installed") -NoNewline
+Add-Content $logfile -Value (Get-HotFix | Select-Object HotFixID, InstalledOn, Description, InstalledBy | Sort-Object InstalledOn -Descending | Format-Table -AutoSize| Out-String)
+
+#Application logs - SentinelOne search
+
+
+
+#System logs - SentinelOne search
