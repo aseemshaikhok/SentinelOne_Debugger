@@ -14,3 +14,5 @@ New-Item -Path $logfile -ItemType File | Out-Null
 $divider  = '================================================================================='
 
 Write-Host "This is Test"
+
+New-Item -path $DesktopPath -name $filename -ItemType "file" | Select-Object DirectoryName 

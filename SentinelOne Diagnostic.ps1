@@ -1,13 +1,15 @@
-﻿#SentinelOne Diagnostic Tool
+﻿###########################################
+#  SentinelOne Installation Diagnostic    #
+#  Version: 1.0                           #
+#  Developer: github.com/aseemshaikhok/   #
+###########################################
 
 Write-Host "SentinelOne Diagnostic Script Started" -BackgroundColor Green -ForegroundColor Black
 
 #define file name
-$DesktopPath = "C:\Windows\Temp\"
-$filename = hostname
-$filename = 'SentinelOne_' + $filename + "_" + (Get-Date -format "MMMddyyyyHHmm") +'.log' #time
-New-Item -path $DesktopPath -name $filename -ItemType "file" | Select-Object DirectoryName
-$logfile = $DesktopPath+'\'+$filename
+$tempPath = "C:\Windows\Temp\"
+$fileName = 'SentinelOne_' + (hostname) + "_" + (Get-Date -format "MMMddyyyyHHmm") +'.log' #time
+$logfile = (New-Item -path $tempPath -name $fileName -ItemType File).FullName
 
 # Define divider
 $divider  = '================================================================================='
@@ -106,21 +108,6 @@ if ($eventLogs){
 
 Add-Content $logfile -Value $divider
 
-
-######################### SentinelOne Installation Info #########################
-
-Write-Host "Fetching SentinelOne Installation Details" -BackgroundColor Green -ForegroundColor Black
-Add-Content $logfile -Value "Sentinel Installer logs `n"
-
-#Read sc-exit code
-try {
-    $eventLogs = Get-Content -Path "C:\Windows\Temp\sc-exit-code.txt"
-    Add-Content $logfile -Value ("Sentinel Installer Exit Code:" + $eventLogs)
-}
-catch {
-    Add-Content $logfile -Value ("No Exit Code Found !!")
-}
-
 ######################### SentinelOne Installation Info #########################
 
 Write-Host "SentinelOne Installation Details" -BackgroundColor Green -ForegroundColor Black
@@ -141,21 +128,20 @@ $latestMsiFilePaths = Get-ChildItem -Recurse -Path "C:\Users\" -Filter "MSI*.LOG
 $latestMsiFilePaths = @($latestMsiFilePaths)
 $latestMsiFilePaths += Get-ChildItem -Path "C:\Windows\Temp\" -Filter "MSI*.LOG" -ErrorAction SilentlyContinue | Select-Object FullName, LastWriteTime 
 $latestMsiFilePaths = $latestMsiFilePaths | Sort-Object LastWriteTime -Descending 
-$latestMsiFilePaths | Format-Table -AutoSize
+$latestMsiFilePaths | Format-Table -AutoSize | Out-Null
 
 try {
-    foreach ($latestMsiFilePath in $latestMsiFilePaths) {
+    :stopforeach foreach ($latestMsiFilePath in $latestMsiFilePaths) {
         if ((Get-Content -Path $latestMsiFilePath.FullName -Filter "Sentinel") -ne $Null) {
             Add-Content $logfile -Value ($latestMsiFilePath.FullName, $latestMsiFilePath.LastWriteTime)
             Add-Content $logfile -Value (Get-Content -Path $latestMsiFilePath.FullName | Select-String "Error" | Out-String -Width 180)
-            break foreach
+            break stopforeach
         }
     }
 }
 catch {
     Add-Content $logfile -Value "No MSI logs found !!"
 }
-
 
 Add-Content $logfile -Value $divider
 
