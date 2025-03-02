@@ -1,5 +1,6 @@
 Objective: SentinelOne troubleshooting tool
 Format Type: ps1 and exe
+Availability through AWS S3 bucket
 
 Challenges to be solved:
 	Sentinet install location
@@ -29,6 +30,7 @@ Functioning:
 			
 			sc-exitcode
 			Installation path
+
 			
 			
 					
